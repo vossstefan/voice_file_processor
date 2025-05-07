@@ -148,13 +148,9 @@ def load_audio(sender, app_data):
             dur = (end - start) / 1000.0
             desc = f'Buffer {idx}: {start}ms - {end}ms ({dur:.2f}s)'
             buffer_descriptions.append(desc)
-            
-            # Add controls for each buffer
-            with dpg.group(parent="buffer_group", horizontal=True):
-                dpg.add_checkbox(label="Merge", tag=f"merge_{idx}", callback=toggle_merge, user_data=idx)
-                dpg.add_text(desc)
-                dpg.add_button(label="Play", tag=f"play_{idx}", callback=play_buffer, user_data=idx)
-                dpg.add_button(label="Repeat", tag=f"repeat_{idx}", callback=toggle_repeat, user_data=idx)
+        
+        # Refresh the buffer list with all controls
+        refresh_buffer_list()
         
         dpg.set_value("status", f"Loaded {len(buffers)} buffers.")
         selected_buffers.clear()
@@ -358,6 +354,82 @@ def process_and_save(sender, app_data):
         print(f"Error saving file: {str(e)}")
         traceback.print_exc()
         dpg.set_value("status", f'Error saving file: {e}')
+
+def move_buffer_up(sender, app_data, user_data):
+    global buffers, speech_regions, buffer_descriptions
+    idx = user_data
+    if idx > 0:  # Can't move first buffer up
+        # Swap buffers
+        buffers[idx], buffers[idx-1] = buffers[idx-1], buffers[idx]
+        speech_regions[idx], speech_regions[idx-1] = speech_regions[idx-1], speech_regions[idx]
+        buffer_descriptions[idx], buffer_descriptions[idx-1] = buffer_descriptions[idx-1], buffer_descriptions[idx]
+        
+        # Update selected and merge sets if needed
+        if idx in selected_buffers:
+            selected_buffers.remove(idx)
+            selected_buffers.add(idx-1)
+        if idx-1 in selected_buffers:
+            selected_buffers.remove(idx-1)
+            selected_buffers.add(idx)
+            
+        if idx in merge_buffers:
+            merge_buffers.remove(idx)
+            merge_buffers.add(idx-1)
+        if idx-1 in merge_buffers:
+            merge_buffers.remove(idx-1)
+            merge_buffers.add(idx)
+        
+        # Refresh the buffer list
+        refresh_buffer_list()
+        dpg.set_value("status", f"Moved buffer {idx} up")
+
+def move_buffer_down(sender, app_data, user_data):
+    global buffers, speech_regions, buffer_descriptions
+    idx = user_data
+    if idx < len(buffers) - 1:  # Can't move last buffer down
+        # Swap buffers
+        buffers[idx], buffers[idx+1] = buffers[idx+1], buffers[idx]
+        speech_regions[idx], speech_regions[idx+1] = speech_regions[idx+1], speech_regions[idx]
+        buffer_descriptions[idx], buffer_descriptions[idx+1] = buffer_descriptions[idx+1], buffer_descriptions[idx]
+        
+        # Update selected and merge sets if needed
+        if idx in selected_buffers:
+            selected_buffers.remove(idx)
+            selected_buffers.add(idx+1)
+        if idx+1 in selected_buffers:
+            selected_buffers.remove(idx+1)
+            selected_buffers.add(idx)
+            
+        if idx in merge_buffers:
+            merge_buffers.remove(idx)
+            merge_buffers.add(idx+1)
+        if idx+1 in merge_buffers:
+            merge_buffers.remove(idx+1)
+            merge_buffers.add(idx)
+        
+        # Refresh the buffer list
+        refresh_buffer_list()
+        dpg.set_value("status", f"Moved buffer {idx} down")
+
+def refresh_buffer_list():
+    # Clear old controls
+    dpg.delete_item("buffer_group", children_only=True)
+    
+    # Add new controls
+    for idx, desc in enumerate(buffer_descriptions):
+        with dpg.group(parent="buffer_group", horizontal=True):
+            dpg.add_checkbox(label="Merge", tag=f"merge_{idx}", callback=toggle_merge, user_data=idx)
+            dpg.add_text(desc)
+            dpg.add_button(label="Play", tag=f"play_{idx}", callback=play_buffer, user_data=idx)
+            dpg.add_button(label="Repeat", tag=f"repeat_{idx}", callback=toggle_repeat, user_data=idx)
+            dpg.add_button(label="Up", tag=f"up_{idx}", callback=move_buffer_up, user_data=idx)
+            dpg.add_button(label="Down", tag=f"down_{idx}", callback=move_buffer_down, user_data=idx)
+            
+            # Update checkbox and repeat button states
+            if idx in merge_buffers:
+                dpg.set_value(f"merge_{idx}", True)
+            if idx in selected_buffers:
+                dpg.configure_item(f"repeat_{idx}", label="Repeating")
 
 def main():
     global merge_buffers
